@@ -6,6 +6,11 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdatomic.h>
+#include <fcntl.h>
+
+atomic_int server_running = 1;
+pthread_t server_thread;
 
 /*
     Initialize a server socket
@@ -23,6 +28,7 @@ void init_server(int *sockfd_ptr, char *address, int log) {
 
     if (sscanf(address, "%15[^:]:%5s", ip, port) != 2) {
         perror("Invalid address format");
+        return;
     }
 
     if (strncmp(ip, "localhost", 9) == 0) {
@@ -33,8 +39,12 @@ void init_server(int *sockfd_ptr, char *address, int log) {
     *sockfd_ptr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (*sockfd_ptr < 0) {
-        perror("Faid to create socket");
+        perror("Failed to create socket");
+        return;
     }
+
+    int flags = fcntl(*sockfd_ptr, F_GETFL, 0);
+    fcntl(*sockfd_ptr, F_SETFL, flags | O_NONBLOCK);
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -42,14 +52,23 @@ void init_server(int *sockfd_ptr, char *address, int log) {
 
     if (inet_pton(AF_INET, ip, &addr.sin_addr) <= 0) {
         perror("Invalid IP address");
+        return;
     }
 
     if (bind(*sockfd_ptr, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("Failed to bind socket");
+        close(*sockfd_ptr);
+        return;
     }
 
-    if (listen(*sockfd_ptr, 5) < 0) {
-        perror("Failed to listen");
+    ServerArgs *args = (ServerArgs*)malloc(sizeof(ServerArgs));
+    args->sockfd_ptr = sockfd_ptr;
+    args->log = log;
+
+    if (pthread_create(&server_thread, NULL, handle_server, args) != 0) {
+        perror("Failed to create server thread");
+        free(args);
+        return;
     }
 
     if (log) {
@@ -57,33 +76,6 @@ void init_server(int *sockfd_ptr, char *address, int log) {
         now = localtime(&curr_time);
         printf("[%02d:%02d:%02d] Server started on %s:%s\n", now->tm_hour, now->tm_min, now->tm_sec, ip, port);
     }
-
-    while (1) {
-        struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-        int client_fd = accept(*sockfd_ptr, (struct sockaddr*)&client_addr, &client_len);
-        if (client_fd < 0) {
-            perror("Failed to accept connection");
-            continue;
-        }
-
-        if (log) {
-            curr_time = time(0);
-            now = localtime(&curr_time);
-            printf("[%02d:%02d:%02d] New connection from %s:%d\n",
-                now->tm_hour, now->tm_min, now->tm_sec, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-        }
-
-        // Создаем поток для обработки соединения
-        pthread_t thread;
-        if (pthread_create(&thread, NULL, handle_client, &client_fd) != 0) {
-            perror("Failed to create thread");
-            close(client_fd);
-        } else {
-            pthread_detach(thread);
-        }
-    }
-
 }
 
 /*
