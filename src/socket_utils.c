@@ -17,7 +17,6 @@ void *handle_client(void* arg) {
         return NULL;
     }
 
-    // Обработка клиента (например, чтение/запись данных)
     close(*client_fd);
     printf("Client disconnected\n");
     free(client_fd);
@@ -71,7 +70,6 @@ void *handle_server(void* arg) {
                     now->tm_hour, now->tm_min, now->tm_sec, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
             }
 
-            // Создаем поток для обработки соединения
             pthread_t thread;
             if (pthread_create(&thread, NULL, handle_client, client_fd) != 0) {
                 perror("Failed to create thread");
@@ -91,8 +89,10 @@ void *handle_server(void* arg) {
     Stop the server
 */
 void stop_server(int sockfd) {
-    server_running = 0; // Останавливаем сервер
+    server_running = 0;
+
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
-    pthread_join(server_thread, NULL); // Ожидаем завершения потока сервера
+
+    pthread_join(server_thread, NULL);
 }

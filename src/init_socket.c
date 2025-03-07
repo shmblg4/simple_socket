@@ -43,6 +43,15 @@ void init_server(int *sockfd_ptr, char *address, int log) {
         return;
     }
 
+    // Устанавливаем SO_REUSEADDR
+    int reuse = 1;
+    if (setsockopt(*sockfd_ptr, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        perror("Failed to set SO_REUSEADDR");
+        close(*sockfd_ptr);
+        return;
+    }
+
+    // Устанавливаем сокет в неблокирующий режим
     int flags = fcntl(*sockfd_ptr, F_GETFL, 0);
     fcntl(*sockfd_ptr, F_SETFL, flags | O_NONBLOCK);
 
@@ -52,6 +61,7 @@ void init_server(int *sockfd_ptr, char *address, int log) {
 
     if (inet_pton(AF_INET, ip, &addr.sin_addr) <= 0) {
         perror("Invalid IP address");
+        close(*sockfd_ptr);
         return;
     }
 
@@ -68,6 +78,7 @@ void init_server(int *sockfd_ptr, char *address, int log) {
     if (pthread_create(&server_thread, NULL, handle_server, args) != 0) {
         perror("Failed to create server thread");
         free(args);
+        close(*sockfd_ptr);
         return;
     }
 
