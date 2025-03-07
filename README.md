@@ -7,7 +7,7 @@
 ## Features
 
 - **Simple API**: Designed with simplicity in mind, the library provides intuitive functions for creating and managing sockets.
-- **Cross-platform**: Works on any platform that supports standard C and TCP sockets.
+- **Linux-focused**: Built specifically for Linux systems, leveraging its native socket APIs.
 - **Error handling**: Clear and consistent error reporting to help you debug your applications.
 - **Extensible**: Easily extendable for additional features like timeouts, SSL/TLS, or custom protocols.
 
